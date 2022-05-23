@@ -1,0 +1,88 @@
+version: "3.7"
+services:
+    # image project
+    laravel-sigimct:
+        build: 
+            args: 
+                user: carlos
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        image: laravel-app
+        restart: unless-stopped
+        working_dir: /var/www/
+        volumes:
+            - ./:/var/www  #apontar o caminho da pasta do projecto laravel
+        depends_on: 
+            - redis
+            - queue
+        networks: 
+            - laravel-eti
+    
+    # nginx
+    nginx-app:
+        image: nginx:latest
+        container_name: nginx
+        restart: unless-stopped
+        ports: 
+            - 9000:80   # binds local 8081 port with nignx's 80 port
+        volumes: 
+            - ./:/var/www  #apontar o caminho da pasta do projecto laravel
+            - ./docker/nginx/:/etc/nginx/conf.d/  # apontar ao fichero de configuracao do nginx
+        networks: 
+            - laravel-eti
+
+    # db mysql
+    mysql-sigimct:
+        image: mysql:8.0.13
+        restart: unless-stopped
+        environment: 
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+        volumes: 
+            - ./.docker/mysql/dbdata:/var/lib/mysql
+        ports: 
+            - 33060:3306
+        networks: 
+            - laravel-eti
+    nodejs:
+        build: 
+            context: .
+            dockerfile: ./node/Dockerfile
+        container_name: nodejs
+        volumes:
+            - ./:/var/www  #apontar o caminho da pasta do projecto laravel
+        command: npm run dev
+            #- D:/projects/quasar/RumukaQuasar/dist/pwa:/app
+        working_dir: C:/Program Files/nodejs:/var/www
+        # C:\Program Files\nodejs
+        # .C:/Program Files/nodejs/:/var/www
+            # command: /bin/sh -c "yarn && npx quasar serve"
+        ports:
+             - "4000:4000"
+        networks:
+            - laravel-eti
+
+    # queue
+    queue-sigimct:
+        restart: unless-stopped
+        image: laravel-app:latest
+        command: 'php artisan queue:work'
+        volumes: 
+            - ./:/var/www  #apontar o caminho da pasta do projecto laravel
+        depends_on: 
+            - redis
+            - app
+        networks: 
+            - laravel-eti
+    # redis
+    redis:
+        image: redis:latest
+        networks: 
+            - laravel-eti
+
+networks: 
+    laravel-eti:
+        driver: bridge
